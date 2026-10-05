@@ -53,6 +53,15 @@
         "retry_key": "343cce2f-6ff2-491e-b9c6-da5098d0a2e9",
         "body": "神奈川大型自動二輪出现可预约日期\n\n2026-11-09\n\n检查时间（日本时间）：2026-10-06T07:00:16.205215+09:00\n预约链接：https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\n名额可能随时变化，请打开官网确认。每个日期只通知一次；不会自动提交预约。",
         "accepted_at": "2026-10-06T07:00:16.205215+09:00"
+      },
+      {
+        "dates": [
+          "2026-11-12"
+        ],
+        "status": "pending",
+        "created_at": "2026-10-06T08:18:57.257345+09:00",
+        "retry_key": "de796e3a-49fc-48dc-80d2-92dd34334db3",
+        "body": "This is the reservation availability notification you requested.\n\nExam: Large motorcycle (大型自動二輪), Kanagawa\nAvailable dates:\n2026-11-12\n\nChecked at (Japan time): 2026-10-06T08:18:57.257345+09:00\nReservation page: https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\nPlease confirm availability on the official reservation page. This monitor does not make a reservation. Each date is reported once to this email address."
       }
     ]
   }
