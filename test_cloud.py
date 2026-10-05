@@ -1,9 +1,13 @@
 import copy
 import unittest
+import io
+import json
+from unittest.mock import patch
+from urllib.error import HTTPError
 from datetime import datetime
 from urllib.error import URLError
 from zoneinfo import ZoneInfo
-from cloud_monitor import notify_new, target_id, ApiFailure
+from cloud_monitor import notify_new, target_id, ApiFailure, request_json
 
 
 DEST = [('email', 'a@example.com'), ('email', 'b@example.com'), ('line', 'test-user')]
@@ -77,6 +81,18 @@ class NotificationsTest(unittest.TestCase):
             self.send(kind, recipient, body, key)
         self.assertTrue(self.run_check(['2026-11-16'], retry))
         self.assertEqual(attempted[0], attempted[1])
+
+    def test_provider_diagnostic_redacts_private_values(self):
+        problem = {'code': 'message_rejected', 'message': 'Recipient blocked',
+                   'fix': 'Remove private@example.com at https://example.com/private?token=secret-value using am_test-secret'}
+        error = HTTPError('https://api.agentmail.to', 403, 'Forbidden', {},
+                          io.BytesIO(json.dumps(problem).encode()))
+        with patch('cloud_monitor.urlopen', side_effect=error):
+            with self.assertRaises(ApiFailure) as caught:
+                request_json('https://api.agentmail.to', 'am_test-secret')
+        self.assertEqual(caught.exception.reason, 'recipient_blocked')
+        for private in ('private@example.com', 'secret-value', 'am_test-secret'):
+            self.assertNotIn(private, caught.exception.detail)
 
 
 if __name__ == '__main__':

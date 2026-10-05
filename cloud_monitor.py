@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import sys
 import uuid
 from datetime import date, datetime, timedelta
@@ -18,10 +19,11 @@ JST = ZoneInfo('Asia/Tokyo')
 
 
 class ApiFailure(Exception):
-    def __init__(self, code, accepted=False, reason='unknown'):
+    def __init__(self, code, accepted=False, reason='unknown', detail=''):
         self.code = code
         self.accepted = accepted
         self.reason = reason
+        self.detail = detail
         super().__init__(f'HTTP {code}')
 
 
@@ -39,6 +41,7 @@ def request_json(url, token, method='GET', payload=None, headers=None):
         accepted = bool(exc.headers.get('x-line-accepted-request-id'))
         # Report only fixed diagnostic categories, never raw provider bodies.
         reason = 'unknown'
+        detail = ''
         try:
             problem = json.loads(exc.read(65536))
             known = {'missing_permission', 'forbidden', 'unknown_api_key',
@@ -48,6 +51,7 @@ def request_json(url, token, method='GET', payload=None, headers=None):
             if problem.get('code') in known:
                 reason = problem['code']
             hint = (str(problem.get('message', ''))+' '+str(problem.get('fix', ''))).lower()
+            detail = safe_diagnostic(str(problem.get('message', ''))+' '+str(problem.get('fix', '')))
             if reason == 'message_rejected':
                 if 'suspend' in hint:
                     reason = 'account_suspended'
@@ -57,7 +61,20 @@ def request_json(url, token, method='GET', payload=None, headers=None):
                     reason = 'recipient_blocked'
         except (ValueError, TypeError, AttributeError):
             pass
-        raise ApiFailure(exc.code, accepted, reason) from None
+        raise ApiFailure(exc.code, accepted, reason, detail) from None
+
+
+def safe_diagnostic(text):
+    for name in ('AGENTMAIL_API_KEY', 'AGENTMAIL_INBOX_ID', 'GITHUB_TOKEN',
+                 'LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'NOTIFY_EMAILS'):
+        value = os.environ.get(name)
+        if value:
+            text = text.replace(value, '[redacted]')
+    text = re.sub(r'https?://\S+', '[url]', text)
+    text = re.sub(r'[\w.+%-]+@[\w.-]+', '[email]', text)
+    text = re.sub(r'\bam_[\w-]+', '[key]', text)
+    text = re.sub(r'Bearer\s+\S+', 'Bearer [redacted]', text, flags=re.I)
+    return ' '.join(text.split())[:1000]
 
 
 class GitHubFiles:
@@ -167,6 +184,8 @@ def notify_new(state, available, destinations, persist, sender=send, now=None):
                 persist(state)
                 failed = True
                 print(kind+': 通知未完成（HTTP '+str(exc.code)+'；原因 '+exc.reason+'）')
+                if exc.detail:
+                    print('服务诊断（已隐去邮箱、链接及凭证）：'+exc.detail)
                 continue
             except (URLError, TimeoutError, OSError):
                 if kind == 'email':
