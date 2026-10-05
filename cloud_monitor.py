@@ -18,9 +18,10 @@ JST = ZoneInfo('Asia/Tokyo')
 
 
 class ApiFailure(Exception):
-    def __init__(self, code, accepted=False):
+    def __init__(self, code, accepted=False, reason='unknown'):
         self.code = code
         self.accepted = accepted
+        self.reason = reason
         super().__init__(f'HTTP {code}')
 
 
@@ -36,8 +37,27 @@ def request_json(url, token, method='GET', payload=None, headers=None):
             return json.loads(body) if body else {}
     except HTTPError as exc:
         accepted = bool(exc.headers.get('x-line-accepted-request-id'))
-        # Provider error bodies may include destinations or credentials.
-        raise ApiFailure(exc.code, accepted) from None
+        # Report only fixed diagnostic categories, never raw provider bodies.
+        reason = 'unknown'
+        try:
+            problem = json.loads(exc.read(65536))
+            known = {'missing_permission', 'forbidden', 'unknown_api_key',
+                     'api_key_expired', 'message_rejected', 'inbox_paused',
+                     'rate_limit_exceeded', 'limit_exceeded', 'service_unavailable',
+                     'internal_error', 'domain_not_verified', 'unauthorized'}
+            if problem.get('code') in known:
+                reason = problem['code']
+            hint = (str(problem.get('message', ''))+' '+str(problem.get('fix', ''))).lower()
+            if reason == 'message_rejected':
+                if 'suspend' in hint:
+                    reason = 'account_suspended'
+                elif 'allow list' in hint or 'allowlist' in hint or 'verification' in hint:
+                    reason = 'recipient_allowlist_or_verification'
+                elif 'block' in hint or 'suppress' in hint:
+                    reason = 'recipient_blocked'
+        except (ValueError, TypeError, AttributeError):
+            pass
+        raise ApiFailure(exc.code, accepted, reason) from None
 
 
 class GitHubFiles:
@@ -146,7 +166,7 @@ def notify_new(state, available, destinations, persist, sender=send, now=None):
                     entry['status'] = 'uncertain'
                 persist(state)
                 failed = True
-                print(kind+': 通知未完成（HTTP '+str(exc.code)+'）')
+                print(kind+': 通知未完成（HTTP '+str(exc.code)+'；原因 '+exc.reason+'）')
                 continue
             except (URLError, TimeoutError, OSError):
                 if kind == 'email':
@@ -207,6 +227,7 @@ def main():
     destinations = targets(include_line=settings.get('line_enabled', False))
     available = scan(today, end)
     print('本轮完整检查完成，范围内空位日期数：'+str(len(available)))
+    print('可预约日期：'+(', '.join(available) or '无'))
     state = files.read('state.json')
     return 0 if notify_new(state, available, destinations, lambda s: files.write('state.json', s)) else 1
 
