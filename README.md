@@ -1,8 +1,8 @@
 # 神奈川大型二轮预约空位监控
 
-云端每5分钟尝试检查当天到指定截止日期的「大型自動二輪」空位，分别发送两封邮件和一条LINE消息。多个新空位日期合并列出；每个日期在每个渠道只通知一次，日期调整不清除历史。程序不会提交预约或勾选同意条款。
+云端每5分钟尝试检查当天到指定截止日期的「大型自動二輪」空位，分别发送两封邮件；LINE通知可选，目前关闭。多个新空位日期合并列出；每个日期在每个渠道只通知一次，日期调整不清除历史。程序不会提交预约或勾选同意条款。
 
-初始状态是暂停；部署成功、三个收件通道测试通过后，再启用。
+当前已启用邮件监控，截止日期为2026-11-16（含）。
 
 ## 一次性设置
 
@@ -19,8 +19,8 @@
 
 `GITHUB_TOKEN`由GitHub自动提供，不需要手动创建。工作流只申请Contents写权限，用于保存设置和通知历史。
 
-3. LINE官方账号应启用Messaging API，并由个人LINE账号加好友。你的用户ID可在同一频道的Basic settings → Your user ID查看。
-4. 打开仓库 Actions → Kanagawa reservation watch → Run workflow，选择`test`。确认两个邮箱与LINE都收到测试通知。
+3. 若以后需要LINE通知，先设置settings.json中的line_enabled为true；LINE官方账号应启用Messaging API，并由个人LINE账号加好友。你的用户ID可在同一频道的Basic settings → Your user ID查看。
+4. 打开仓库 Actions → Kanagawa reservation watch → Run workflow，选择`test`。确认两个邮箱收到测试通知；仅在启用LINE时检查LINE。
 5. 测试完成后，Run workflow选择`enable`。之后不需电脑开机或保持网页打开。
 
 ## 用手机修改范围
@@ -37,6 +37,6 @@
 
 GitHub定时运行可能延迟或被跳过，不能保证严格每5分钟执行，公共仓库长时间无活动也可能自动暂停定时任务。日期到期后程序自动暂停；恢复日期后可重新启用。网页获取失败不会被判成没有空位。页面结构改变或要求验证码时需要人工处理。
 
-目前源码已准备，官方日历结构已通过浏览器检查；本地解析和通知逻辑可用单元测试验证。云端实际扫描、邮件API凭证和LINE凭证仍需完成运行测试。具体上线状态以GitHub运行记录和三个通道的实际测试通知为准。
+完整云端日历扫描、邮件API发送测试和通知逻辑测试已通过。LINE通知目前关闭。具体运行状态以GitHub运行记录为准。
 
 参考：[GitHub定时事件](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)、[AgentMail发送接口](https://docs.agentmail.to/api-reference/inboxes/messages/send)、[LINE设置](https://developers.line.biz/en/docs/messaging-api/getting-started/)、[LINE用户ID](https://developers.line.biz/en/docs/messaging-api/getting-user-ids/)、[LINE安全重试](https://developers.line.biz/en/docs/messaging-api/retrying-api-request/)。

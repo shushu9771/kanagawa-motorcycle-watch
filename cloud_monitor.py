@@ -179,15 +179,15 @@ def main():
         return 0
     if mode in {'enable', 'pause'}:
         if mode == 'enable':
-            targets()  # Both channels must be configured before enabling.
+            targets(include_line=settings.get('line_enabled', False))
         settings['enabled'] = mode == 'enable'
         files.write('settings.json', settings)
         print('已启用' if settings['enabled'] else '已暂停')
         return 0
     if mode in {'test', 'email_test'}:
-        include_line = mode == 'test' and bool(os.environ.get('LINE_CHANNEL_ACCESS_TOKEN') and os.environ.get('LINE_USER_ID'))
+        include_line = mode == 'test' and settings.get('line_enabled', False)
         if mode == 'test' and not include_line:
-            print('LINE尚未配置；本次只测试两个邮件地址，启用仍要求双通道配置完整。')
+            print('LINE通知已关闭；本次只测试两个邮件地址。')
         for kind, recipient in targets(include_line=include_line):
             send(kind, recipient, '神奈川大型二轮预约监控：测试通知。\n这不是空位通知。\n截止日期：'+settings['end_date'], str(uuid.uuid4()))
             print(kind+': 测试通知已被服务接受')
@@ -204,7 +204,7 @@ def main():
         files.write('settings.json', settings)
         print('已过截止日期，自动暂停。')
         return 0
-    destinations = targets()
+    destinations = targets(include_line=settings.get('line_enabled', False))
     available = scan(today, end)
     print('本轮完整检查完成，范围内空位日期数：'+str(len(available)))
     state = files.read('state.json')
