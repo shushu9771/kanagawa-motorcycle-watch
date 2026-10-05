@@ -21,15 +21,6 @@
         "retry_key": "047286dd-80c8-4e8e-8ab9-025f0a094dbe",
         "body": "神奈川大型自動二輪出现可预约日期\n\n2026-11-09\n\n检查时间（日本时间）：2026-10-06T07:00:16.205215+09:00\n预约链接：https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\n名额可能随时变化，请打开官网确认。每个日期只通知一次；不会自动提交预约。",
         "accepted_at": "2026-10-06T07:00:16.205215+09:00"
-      },
-      {
-        "dates": [
-          "2026-11-12"
-        ],
-        "status": "pending",
-        "created_at": "2026-10-06T08:11:46.856181+09:00",
-        "retry_key": "ec526e18-533f-484b-b980-d79bb09e3d10",
-        "body": "神奈川大型自動二輪出现可预约日期\n\n2026-11-12\n\n检查时间（日本时间）：2026-10-06T08:11:46.856181+09:00\n预约链接：https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\n名额可能随时变化，请打开官网确认。每个日期只通知一次；不会自动提交预约。"
       }
     ],
     "email:29b4a670c13fa61579b22cdd9a1214dcf46ba6b6f7a960f59ec2ac5787fb884e": [
