@@ -64,8 +64,10 @@ class GitHubFiles:
         self.shas[path] = data['content']['sha']
 
 
-def targets():
-    required = ['AGENTMAIL_API_KEY', 'AGENTMAIL_INBOX_ID', 'NOTIFY_EMAILS', 'LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID']
+def targets(include_line=True):
+    required = ['AGENTMAIL_API_KEY', 'AGENTMAIL_INBOX_ID', 'NOTIFY_EMAILS']
+    if include_line:
+        required += ['LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID']
     missing = [name for name in required if not os.environ.get(name)]
     if missing:
         raise ValueError('未设置：'+', '.join(missing))
@@ -74,7 +76,7 @@ def targets():
         raise ValueError('NOTIFY_EMAILS必须是包含两个邮箱地址的JSON列表')
     if len(set(recipients)) != 2:
         raise ValueError('两个收件地址不能重复')
-    return [('email', r) for r in recipients]+[('line', os.environ['LINE_USER_ID'])]
+    return [('email', r) for r in recipients]+([('line', os.environ['LINE_USER_ID'])] if include_line else [])
 
 
 def target_id(kind, recipient):
@@ -182,8 +184,11 @@ def main():
         files.write('settings.json', settings)
         print('已启用' if settings['enabled'] else '已暂停')
         return 0
-    if mode == 'test':
-        for kind, recipient in targets():
+    if mode in {'test', 'email_test'}:
+        include_line = mode == 'test' and bool(os.environ.get('LINE_CHANNEL_ACCESS_TOKEN') and os.environ.get('LINE_USER_ID'))
+        if mode == 'test' and not include_line:
+            print('LINE尚未配置；本次只测试两个邮件地址，启用仍要求双通道配置完整。')
+        for kind, recipient in targets(include_line=include_line):
             send(kind, recipient, '神奈川大型二轮预约监控：测试通知。\n这不是空位通知。\n截止日期：'+settings['end_date'], str(uuid.uuid4()))
             print(kind+': 测试通知已被服务接受')
         return 0
