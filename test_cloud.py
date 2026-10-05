@@ -94,6 +94,16 @@ class NotificationsTest(unittest.TestCase):
         for private in ('private@example.com', 'secret-value', 'am_test-secret'):
             self.assertNotIn(private, caught.exception.detail)
 
+    def test_spam_budget_is_not_reported_as_recipient_block(self):
+        problem = {'code': 'message_rejected',
+                   'message': 'This message was classified as spam; budget of 5 spam-flagged messages exceeded. Messages are blocked until reset.'}
+        error = HTTPError('https://api.agentmail.to', 403, 'Forbidden', {},
+                          io.BytesIO(json.dumps(problem).encode()))
+        with patch('cloud_monitor.urlopen', side_effect=error):
+            with self.assertRaises(ApiFailure) as caught:
+                request_json('https://api.agentmail.to', 'test-token')
+        self.assertEqual(caught.exception.reason, 'spam_budget_exceeded')
+
 
 if __name__ == '__main__':
     unittest.main()

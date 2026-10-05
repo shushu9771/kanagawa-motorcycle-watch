@@ -53,7 +53,9 @@ def request_json(url, token, method='GET', payload=None, headers=None):
             hint = (str(problem.get('message', ''))+' '+str(problem.get('fix', ''))).lower()
             detail = safe_diagnostic(str(problem.get('message', ''))+' '+str(problem.get('fix', '')))
             if reason == 'message_rejected':
-                if 'suspend' in hint:
+                if 'classified as spam' in hint:
+                    reason = 'spam_budget_exceeded' if 'budget' in hint else 'spam_classified'
+                elif 'suspend' in hint:
                     reason = 'account_suspended'
                 elif 'allow list' in hint or 'allowlist' in hint or 'verification' in hint:
                     reason = 'recipient_allowlist_or_verification'
@@ -125,7 +127,7 @@ def send(kind, recipient, body, retry_key):
         inbox = quote(os.environ['AGENTMAIL_INBOX_ID'], safe='')
         return request_json('https://api.agentmail.to/v0/inboxes/'+inbox+'/messages/send',
                             os.environ['AGENTMAIL_API_KEY'], 'POST',
-                            {'to': [recipient], 'subject': '神奈川大型二轮预约通知', 'text': body})
+                            {'to': [recipient], 'subject': 'Kanagawa large motorcycle reservation availability', 'text': body})
     try:
         return request_json('https://api.line.me/v2/bot/message/push',
                             os.environ['LINE_CHANNEL_ACCESS_TOKEN'], 'POST',
@@ -138,9 +140,14 @@ def send(kind, recipient, body, retry_key):
 
 
 def make_body(days, stamp):
-    return ('神奈川大型自動二輪出现可预约日期\n\n'+'\n'.join(days)+
-            '\n\n检查时间（日本时间）：'+stamp+'\n预约链接：'+URL+
-            '\n\n名额可能随时变化，请打开官网确认。每个日期只通知一次；不会自动提交预约。')
+    return ('This is the reservation availability notification you requested.\n\n'
+            'Exam: Large motorcycle (大型自動二輪), Kanagawa\n'
+            'Available dates:\n'+'\n'.join(days)+
+            '\n\nChecked at (Japan time): '+stamp+
+            '\nReservation page: '+URL+
+            '\n\nPlease confirm availability on the official reservation page. '
+            'This monitor does not make a reservation. '
+            'Each date is reported once to this email address.')
 
 
 def notify_new(state, available, destinations, persist, sender=send, now=None):
