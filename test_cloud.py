@@ -8,6 +8,7 @@ from datetime import datetime
 from urllib.error import URLError
 from zoneinfo import ZoneInfo
 from cloud_monitor import notify_new, target_id, ApiFailure, request_json
+from calendar_scan import scan, CalendarTimeout
 
 
 DEST = [('email', 'a@example.com'), ('email', 'b@example.com'), ('line', 'test-user')]
@@ -103,6 +104,25 @@ class NotificationsTest(unittest.TestCase):
             with self.assertRaises(ApiFailure) as caught:
                 request_json('https://api.agentmail.to', 'test-token')
         self.assertEqual(caught.exception.reason, 'spam_budget_exceeded')
+
+
+class CalendarRetryTest(unittest.TestCase):
+    def test_timeout_restarts_entire_scan(self):
+        with patch('calendar_scan._scan_once', side_effect=[CalendarTimeout(), ['2026-11-12']]) as attempt, patch('calendar_scan.time.sleep'):
+            self.assertEqual(scan('start', 'end'), ['2026-11-12'])
+            self.assertEqual(attempt.call_count, 2)
+
+    def test_persistent_timeout_is_still_failure(self):
+        with patch('calendar_scan._scan_once', side_effect=CalendarTimeout()) as attempt, patch('calendar_scan.time.sleep'):
+            with self.assertRaises(CalendarTimeout):
+                scan('start', 'end')
+            self.assertEqual(attempt.call_count, 2)
+
+    def test_invalid_calendar_is_not_retried_or_treated_as_empty(self):
+        with patch('calendar_scan._scan_once', side_effect=ValueError('invalid calendar')) as attempt:
+            with self.assertRaises(ValueError):
+                scan('start', 'end')
+            self.assertEqual(attempt.call_count, 1)
 
 
 if __name__ == '__main__':

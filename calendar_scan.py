@@ -72,8 +72,30 @@ def parse_calendar(html):
     return result
 
 
+class CalendarTimeout(TimeoutError):
+    pass
+
+
 def scan(start, end, headed=False):
-    from playwright.sync_api import sync_playwright
+    for attempt in range(2):
+        try:
+            return _scan_once(start, end, headed)
+        except CalendarTimeout:
+            if attempt == 1:
+                raise
+            print('日历读取超时；5秒后重新打开网页并完整检查一次。')
+            time.sleep(5)
+
+
+def _scan_once(start, end, headed=False):
+    from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+    try:
+        return _scan_browser(start, end, headed, sync_playwright)
+    except PlaywrightTimeout:
+        raise CalendarTimeout('日历读取超时，完整扫描未完成') from None
+
+
+def _scan_browser(start, end, headed, sync_playwright):
     all_days = {}
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not headed)
@@ -110,5 +132,4 @@ def scan(start, end, headed=False):
 def page_date_text(dt):
     # Compare the numeric portion of the header rather than weekday text.
     return f'{dt.month}/{dt.day}'
-
 
