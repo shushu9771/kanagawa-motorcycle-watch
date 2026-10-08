@@ -12,7 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
-from calendar_scan import scan, URL
+from calendar_scan import scan, URL, CalendarScanError
 
 ROOT = Path(__file__).resolve().parent
 JST = ZoneInfo('Asia/Tokyo')
@@ -264,4 +264,6 @@ if __name__ == '__main__':
     except Exception as exc:
         # Never emit raw HTTP errors, contact addresses or tokens to public logs.
         print('本轮未完成：'+type(exc).__name__+'。请检查连接、配置及运行记录。')
+        if isinstance(exc, CalendarScanError):
+            print('日历诊断：'+str(exc))
         sys.exit(1)

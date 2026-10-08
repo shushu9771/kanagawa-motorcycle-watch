@@ -2,13 +2,13 @@ import copy
 import unittest
 import io
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from urllib.error import HTTPError
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from urllib.error import URLError
 from zoneinfo import ZoneInfo
 from cloud_monitor import notify_new, target_id, ApiFailure, request_json
-from calendar_scan import scan, CalendarTimeout
+from calendar_scan import scan, CalendarTimeout, CalendarScanError, _scan_browser, PREVIOUS
 
 
 DEST = [('email', 'a@example.com'), ('email', 'b@example.com'), ('line', 'test-user')]
@@ -104,6 +104,55 @@ class NotificationsTest(unittest.TestCase):
             with self.assertRaises(ApiFailure) as caught:
                 request_json('https://api.agentmail.to', 'test-token')
         self.assertEqual(caught.exception.reason, 'spam_budget_exceeded')
+
+
+class CalendarWindowTest(unittest.TestCase):
+    def run_calendar(self, first, end, previous_enabled=False, missing=None):
+        start = date(2026, 10, 8)
+        blocks = []
+        day = first
+        while day <= max(first, end):
+            block = {day+timedelta(days=i): day+timedelta(days=i) == end for i in range(14)}
+            if missing in block:
+                del block[missing]
+            blocks.append(block)
+            day += timedelta(days=14)
+        pw = MagicMock()
+        browser = pw.return_value.__enter__.return_value.chromium.launch.return_value
+        page = browser.new_page.return_value
+        page.goto.return_value.status = 200
+        def button(role, name, exact):
+            control = MagicMock()
+            control.is_enabled.return_value = previous_enabled if name == PREVIOUS else True
+            return control
+        page.get_by_role.side_effect = button
+        with patch('calendar_scan.parse_calendar', side_effect=blocks), patch('calendar_scan.time.sleep'):
+            result = _scan_browser(start, end, False, pw)
+        browser.close.assert_called_once()
+        return result, page
+
+    def test_disabled_previous_allows_official_start_and_keeps_end(self):
+        end = date(2026, 11, 16)
+        result, page = self.run_calendar(date(2026, 10, 11), end)
+        self.assertEqual(result, ['2026-11-16'])
+        self.assertEqual(page.wait_for_function.call_count, 2)
+
+    def test_enabled_previous_does_not_allow_skipping_dates(self):
+        with self.assertRaisesRegex(CalendarScanError, '向前翻页仍可用'):
+            self.run_calendar(date(2026, 10, 11), date(2026, 11, 16), True)
+
+    def test_earlier_calendar_still_uses_requested_start(self):
+        result, _ = self.run_calendar(date(2026, 10, 4), date(2026, 10, 17), True)
+        self.assertEqual(result, ['2026-10-17'])
+
+    def test_missing_date_inside_effective_window_is_still_failure(self):
+        with self.assertRaisesRegex(CalendarScanError, '未完整覆盖'):
+            self.run_calendar(date(2026, 10, 11), date(2026, 11, 16), missing=date(2026, 10, 29))
+
+    def test_official_start_after_end_returns_empty_and_closes_browser(self):
+        result, page = self.run_calendar(date(2026, 10, 11), date(2026, 10, 10))
+        self.assertEqual(result, [])
+        page.wait_for_function.assert_not_called()
 
 
 class CalendarRetryTest(unittest.TestCase):

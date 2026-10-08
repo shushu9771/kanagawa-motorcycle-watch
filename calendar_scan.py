@@ -4,6 +4,7 @@ import re
 import time
 URL = "https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList"
 NEXT = "2週後のカレンダーページへ"
+PREVIOUS = "2週前のカレンダーページへ"
 
 class CalendarParser(HTMLParser):
     def __init__(self):
@@ -76,6 +77,11 @@ class CalendarTimeout(TimeoutError):
     pass
 
 
+class CalendarScanError(RuntimeError):
+    """Fixed, public-safe calendar diagnostics; never contains page content."""
+    pass
+
+
 def scan(start, end, headed=False):
     for attempt in range(2):
         try:
@@ -97,6 +103,7 @@ def _scan_once(start, end, headed=False):
 
 def _scan_browser(start, end, headed, sync_playwright):
     all_days = {}
+    effective_start = start
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not headed)
         try:
@@ -104,28 +111,37 @@ def _scan_browser(start, end, headed, sync_playwright):
             page.set_default_timeout(30000)
             response = page.goto(URL, wait_until='domcontentloaded', timeout=60000)
             if response is None or response.status >= 400:
-                raise RuntimeError('预约网页访问失败')
-            for _ in range(16):
+                raise CalendarScanError('预约网页访问失败')
+            for page_index in range(16):
                 page.locator('[id="height_auto_大型自動二輪"]').wait_for(state='attached')
                 block = parse_calendar('<table id="TBL">'+page.locator('#TBL').inner_html()+'</table>')
+                if page_index == 0 and min(block) > start:
+                    previous = page.get_by_role('button', name=PREVIOUS, exact=True)
+                    if previous.is_enabled():
+                        raise CalendarScanError('首页晚于监控起点，但向前翻页仍可用；不能跳过此前日期')
+                    effective_start = min(block)
+                    print('官网向前翻页已禁用；本轮起始日期调整为 '+effective_start.isoformat())
+                    if effective_start > end:
+                        print('官网最早显示日期已超过截止日期；本轮没有可检查日期。')
+                        return []
                 all_days.update(block)
                 if max(block) >= end:
                     break
                 button = page.get_by_role('button', name=NEXT, exact=True)
                 if not button.is_enabled():
-                    raise RuntimeError('网页暂未提供全部目标日期，不能完成本轮检查')
+                    raise CalendarScanError('网页暂未提供全部目标日期，不能完成本轮检查')
                 old_first = min(block)
                 button.click()
                 page.wait_for_function('old => {const c=document.querySelector("#height_headday td"); const m=c && c.innerText.match(/(\\d{1,2})\\/(\\d{1,2})/); return m && (Number(m[1])+"/"+Number(m[2])) !== old;}', arg=page_date_text(old_first))
                 time.sleep(1)
             else:
-                raise RuntimeError('日历翻页超过预期范围')
+                raise CalendarScanError('日历翻页超过预期范围')
         finally:
             browser.close()
-    expected = (end-start).days + 1
-    covered = {dt for dt in all_days if start <= dt <= end}
+    expected = (end-effective_start).days + 1
+    covered = {dt for dt in all_days if effective_start <= dt <= end}
     if len(covered) != expected:
-        raise RuntimeError('未完整覆盖目标日期，本轮状态不会写入')
+        raise CalendarScanError('未完整覆盖目标日期，本轮状态不会写入')
     return sorted(dt.isoformat() for dt in covered if all_days[dt])
 
 
