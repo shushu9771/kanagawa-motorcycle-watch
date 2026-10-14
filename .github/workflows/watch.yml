@@ -46,6 +46,7 @@ jobs:
           NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
         run: python cloud_monitor.py
       - name: Verify live calendar without sending notifications
         if: inputs.mode == 'scan'
@@ -55,7 +56,8 @@ jobs:
           from datetime import date, datetime
           from zoneinfo import ZoneInfo
           from calendar_scan import scan
+          from cloud_monitor import monitor_start
           settings = json.load(open('settings.json'))
-          days = scan(datetime.now(ZoneInfo('Asia/Tokyo')).date(), date.fromisoformat(settings['end_date']))
+          days = scan(monitor_start(settings, datetime.now(ZoneInfo('Asia/Tokyo')).date()), date.fromisoformat(settings['end_date']))
           print('Available large-motorcycle dates:', ', '.join(days) or 'none')
           PY
