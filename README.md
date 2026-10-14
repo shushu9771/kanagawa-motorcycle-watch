@@ -1,8 +1,8 @@
 # 神奈川大型二轮预约空位监控
 
-云端每5分钟尝试检查当天到指定截止日期的「大型自動二輪」空位，分别发送两封邮件；LINE通知可选，目前关闭。多个新空位日期合并列出；每个日期在每个渠道只通知一次，日期调整不清除历史。程序不会提交预约或勾选同意条款。
+云端每5分钟尝试检查指定日期范围的「大型自動二輪」空位；实际执行可能延迟。空位日期合并列出，分别通知两个邮件地址。当前每次独立检查发现空位都会提醒；重跑同一运行编号不会重复发送。微信通过pushplus可选，需配置密钥；LINE目前关闭。程序不会提交预约或勾选同意条款。
 
-当前已启用邮件监控，截止日期为2026-11-16（含）。
+当前已启用邮件监控，范围为2026-11-19至2026-11-25（含首尾）。微信接口已准备，尚需个人账号绑定与PUSHPLUS_TOKEN。
 
 ## 一次性设置
 
@@ -14,6 +14,7 @@
 | `AGENTMAIL_API_KEY` | AgentMail的程序访问密钥，需在AgentMail控制台创建；ChatGPT的OAuth连接不能代替GitHub运行器的密钥 |
 | `AGENTMAIL_INBOX_ID` | 专用通知邮箱的inbox ID |
 | `NOTIFY_EMAILS` | 两个收件邮箱构成的JSON数组，例如 `["first@example.com", "second@example.com"]` |
+| `PUSHPLUS_TOKEN` | pushplus消息token；需在自己的账号完成微信绑定及服务要求的实名认证，并保存到GitHub Secrets |
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE官方账号Messaging API的访问令牌 |
 | `LINE_USER_ID` | 你的LINE开发者用户ID；不是昵称、手机号或公开LINE ID |
 
@@ -25,13 +26,22 @@
 
 ## 用手机修改范围
 
-打开同一Actions页面，Run workflow选择`set_range`，在end_date填写新的日期（如`2026-11-16`）。每轮开始日期始终是日本时间当天。修改日期不会自动启用已暂停的任务；需要时另选`enable`。选择`pause`可暂停。选择`check`立即检查一轮。
+打开仓库settings.json并编辑start_date、end_date，可以同时更改范围。也可以在Actions页面Run workflow选择`set_range`，只更改end_date（新的截止日期须不早于start_date）。固定起始日期在settings.json的start_date中修改，截止日期在end_date中修改。每轮从固定起始日期和日本时间当天中较晚的一天开始；官网最早显示日期更晚且向前翻页禁用时，按官网最早日期开始。修改日期不会自动启用已暂停的任务；需要时另选`enable`。选择`pause`可暂停。选择`check`立即检查一轮。
+
+## 微信设置和重复提醒
+
+1. 在 https://www.pushplus.plus/ 登录，关注并绑定自己的微信，按服务要求完成实名认证。
+2. 从个人账号获取消息token，保存到仓库 Settings → Secrets and variables → Actions → Repository secrets，名称为PUSHPLUS_TOKEN。不要放入公开文件或聊天。
+3. settings.json中的wechat_enabled目前为true；缺少密钥时跳过微信，邮件继续。保存密钥后运行test并确认手机收到微信消息，才能确认送达。
+4. pushplus微信免费渠道每日少于200次请求；达到限额后无法继续推送，次日恢复。接口code=200仅代表排队接受，不保证手机已收到。
+
+repeat_mode为every_check时，每轮检查到空位均发送。改为once可恢复每日期每渠道只提醒一次。旧通知历史保留，重复模式只保存最近一轮记录，避免文件无限增长。
 
 ## 通知状态
 
 `state.json`只记录日期、通道目标的SHA-256指纹、请求重试ID和通知状态，不包含邮箱地址、LINE用户ID或密钥。状态会提交至仓库，不能删除，否则可能重复通知。修改收件目标会生成新的通道指纹。
 
-每次先保存待发送记录，再发送，最后保存服务已接受的记录。LINE重试使用同一`X-Line-Retry-Key`和内容；超过23小时仍无法确认时停止自动重试。邮件超时、5xx或进程中断可能无法确认是否已被接受，此时记录为`uncertain`，先在AgentMail核实，避免自动重复发信。必要时人工恢复未实际发送的记录。通知服务接受请求不等于最终送达，尤其是收件人屏蔽机器人或公司邮件过滤时。
+每次先保存待发送记录，再发送，最后保存服务已接受的记录。LINE重试使用同一`X-Line-Retry-Key`和内容；超过23小时仍无法确认时停止自动重试。邮件超时、5xx或进程中断可能无法确认是否已被接受，此时记录为`uncertain`，同一运行编号不会自动重复发信。once模式先在AgentMail核实；every_check模式下一次独立检查仍会按用户要求重新提醒。必要时人工恢复未实际发送的记录。通知服务接受请求不等于最终送达，尤其是收件人屏蔽机器人或公司邮件过滤时。
 
 ## 限制与验证
 
