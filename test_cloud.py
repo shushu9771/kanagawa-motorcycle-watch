@@ -7,7 +7,7 @@ from urllib.error import HTTPError
 from datetime import date, datetime, timedelta
 from urllib.error import URLError
 from zoneinfo import ZoneInfo
-from cloud_monitor import notify_new, target_id, ApiFailure, request_json
+from cloud_monitor import notify_new, notify_every_check, monitor_start, send, target_id, ApiFailure, request_json
 from calendar_scan import scan, CalendarTimeout, CalendarScanError, _scan_browser, PREVIOUS
 
 
@@ -104,6 +104,47 @@ class NotificationsTest(unittest.TestCase):
             with self.assertRaises(ApiFailure) as caught:
                 request_json('https://api.agentmail.to', 'test-token')
         self.assertEqual(caught.exception.reason, 'spam_budget_exceeded')
+
+
+class UpdatedMonitorTest(unittest.TestCase):
+    def test_fixed_start_and_expired_dates(self):
+        settings = {'start_date': '2026-11-19'}
+        self.assertEqual(monitor_start(settings, date(2026, 10, 14)), date(2026, 11, 19))
+        self.assertEqual(monitor_start(settings, date(2026, 11, 21)), date(2026, 11, 21))
+
+    def test_repeat_on_new_run_but_not_job_rerun(self):
+        state = {'deliveries': {'old': [{'dates': ['2026-11-20'], 'status': 'sent'}]}}
+        original = copy.deepcopy(state['deliveries'])
+        sender = MagicMock()
+        persist = MagicMock()
+        for run in ('1', '1', '2'):
+            self.assertTrue(notify_every_check(state, ['2026-11-20', '2026-11-25'], DEST[:2], persist, run, sender, NOW))
+        self.assertEqual(sender.call_count, 4)
+        self.assertEqual(state['deliveries'], original)
+        self.assertEqual(state['repeat_batch']['run_id'], '2')
+        self.assertEqual(len(state['repeat_batch']['deliveries']), 2)
+
+    def test_empty_check_does_not_remind(self):
+        sender = MagicMock()
+        self.assertTrue(notify_every_check({}, [], DEST[:2], MagicMock(), '1', sender, NOW))
+        sender.assert_not_called()
+
+    def test_uncertain_send_not_retried_same_run_but_new_check_allowed(self):
+        state = {}
+        sender = MagicMock(side_effect=URLError('timeout'))
+        self.assertFalse(notify_every_check(state, ['2026-11-20'], DEST[:1], MagicMock(), '1', sender, NOW))
+        self.assertFalse(notify_every_check(state, ['2026-11-20'], DEST[:1], MagicMock(), '1', sender, NOW))
+        self.assertEqual(sender.call_count, 1)
+        sender.side_effect = None
+        self.assertTrue(notify_every_check(state, ['2026-11-20'], DEST[:1], MagicMock(), '2', sender, NOW))
+        self.assertEqual(sender.call_count, 2)
+
+    def test_wechat_application_rejection_is_not_success(self):
+        with patch.dict('os.environ', {'PUSHPLUS_TOKEN': 'test-private-token'}), patch('cloud_monitor.request_json', return_value={'code': 600}) as request:
+            with self.assertRaises(ApiFailure):
+                send('wechat', 'pushplus-self', 'test body', 'retry')
+            self.assertEqual(request.call_args.args[0], 'https://www.pushplus.plus/send')
+            self.assertEqual(request.call_args.args[3]['channel'], 'wechat')
 
 
 class CalendarWindowTest(unittest.TestCase):

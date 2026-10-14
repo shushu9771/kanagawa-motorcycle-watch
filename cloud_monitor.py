@@ -68,7 +68,7 @@ def request_json(url, token, method='GET', payload=None, headers=None):
 
 def safe_diagnostic(text):
     for name in ('AGENTMAIL_API_KEY', 'AGENTMAIL_INBOX_ID', 'GITHUB_TOKEN',
-                 'LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'NOTIFY_EMAILS'):
+                 'LINE_CHANNEL_ACCESS_TOKEN', 'LINE_USER_ID', 'NOTIFY_EMAILS', 'PUSHPLUS_TOKEN'):
         value = os.environ.get(name)
         if value:
             text = text.replace(value, '[redacted]')
@@ -123,6 +123,16 @@ def target_id(kind, recipient):
 
 
 def send(kind, recipient, body, retry_key):
+    if kind == 'wechat':
+        result = request_json('https://www.pushplus.plus/send', '', 'POST',
+                              {'token': os.environ['PUSHPLUS_TOKEN'],
+                               'title': '神奈川大型二轮预约空位', 'content': body,
+                               'template': 'txt', 'channel': 'wechat'},
+                              {'Authorization': ''})
+        if result.get('code') != 200:
+            raise ApiFailure(400, reason='wechat_request_rejected')
+        # Acceptance is asynchronous; this is not proof of delivery to the phone.
+        return result
     if kind == 'email':
         inbox = quote(os.environ['AGENTMAIL_INBOX_ID'], safe='')
         return request_json('https://api.agentmail.to/v0/inboxes/'+inbox+'/messages/send',
@@ -147,7 +157,7 @@ def make_body(days, stamp):
             '\nReservation page: '+URL+
             '\n\nPlease confirm availability on the official reservation page. '
             'This monitor does not make a reservation. '
-            'Each date is reported once to this email address.')
+            'Availability can change before you open the reservation page.')
 
 
 def notify_new(state, available, destinations, persist, sender=send, now=None):
@@ -211,6 +221,32 @@ def notify_new(state, available, destinations, persist, sender=send, now=None):
     return not failed
 
 
+def monitor_targets(settings, email_only=False):
+    destinations = targets(include_line=not email_only and settings.get('line_enabled', False))
+    if not email_only and settings.get('wechat_enabled', False):
+        if os.environ.get('PUSHPLUS_TOKEN'):
+            destinations.append(('wechat', 'pushplus-self'))
+        else:
+            print('微信尚未配置 PUSHPLUS_TOKEN；本轮继续邮件提醒。')
+    return destinations
+
+
+def monitor_start(settings, today):
+    return max(today, date.fromisoformat(settings.get('start_date', today.isoformat())))
+
+
+def notify_every_check(state, available, destinations, persist, run_id, sender=send, now=None):
+    if not run_id:
+        raise ValueError('重复提醒需要唯一运行编号')
+    # Keep one batch per run, so rerunning the same job cannot duplicate a send.
+    # A later independent check is deliberately allowed to repeat the reminder.
+    batch = state.get('repeat_batch')
+    if batch is None or batch['run_id'] != run_id:
+        batch = {'run_id': run_id, 'deliveries': {}}
+        state['repeat_batch'] = batch
+    return notify_new(batch, available, destinations, lambda _: persist(state), sender, now)
+
+
 def main():
     mode = os.environ.get('MONITOR_MODE', 'check')
     files = GitHubFiles()
@@ -225,16 +261,13 @@ def main():
         return 0
     if mode in {'enable', 'pause'}:
         if mode == 'enable':
-            targets(include_line=settings.get('line_enabled', False))
+            monitor_targets(settings)
         settings['enabled'] = mode == 'enable'
         files.write('settings.json', settings)
         print('已启用' if settings['enabled'] else '已暂停')
         return 0
     if mode in {'test', 'email_test'}:
-        include_line = mode == 'test' and settings.get('line_enabled', False)
-        if mode == 'test' and not include_line:
-            print('LINE通知已关闭；本次只测试两个邮件地址。')
-        for kind, recipient in targets(include_line=include_line):
+        for kind, recipient in monitor_targets(settings, email_only=mode == 'email_test'):
             send(kind, recipient, '神奈川大型二轮预约监控：测试通知。\n这不是空位通知。\n截止日期：'+settings['end_date'], str(uuid.uuid4()))
             print(kind+': 测试通知已被服务接受')
         return 0
@@ -250,11 +283,18 @@ def main():
         files.write('settings.json', settings)
         print('已过截止日期，自动暂停。')
         return 0
-    destinations = targets(include_line=settings.get('line_enabled', False))
-    available = scan(today, end)
+    destinations = monitor_targets(settings)
+    start = monitor_start(settings, today)
+    if start > end:
+        raise ValueError('起始日期不能晚于截止日期')
+    print('本轮监控日期范围：'+start.isoformat()+' 至 '+end.isoformat())
+    available = scan(start, end)
     print('本轮完整检查完成，范围内空位日期数：'+str(len(available)))
     print('可预约日期：'+(', '.join(available) or '无'))
     state = files.read('state.json')
+    if settings.get('repeat_mode', 'once') == 'every_check':
+        return 0 if notify_every_check(state, available, destinations, lambda s: files.write('state.json', s),
+                                      os.environ.get('GITHUB_RUN_ID')) else 1
     return 0 if notify_new(state, available, destinations, lambda s: files.write('state.json', s)) else 1
 
 

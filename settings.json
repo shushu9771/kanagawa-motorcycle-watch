@@ -1,5 +1,8 @@
 {
   "enabled": true,
-  "end_date": "2026-11-16",
-  "line_enabled": false
+  "start_date": "2026-11-19",
+  "end_date": "2026-11-25",
+  "line_enabled": false,
+  "repeat_mode": "every_check",
+  "wechat_enabled": true
 }
