@@ -209,42 +209,17 @@
     ]
   },
   "repeat_batch": {
-    "run_id": "40240650810",
+    "run_id": "40985872732",
     "deliveries": {
       "email:fa86ab3e40d37ac81a302063b7f51dee8ef96c2c02657a0cdda7fdad19926dfe": [
         {
           "dates": [
-            "2026-11-09"
+            "2026-11-30"
           ],
-          "status": "sent",
-          "created_at": "2026-10-26T07:32:54.306776+09:00",
-          "retry_key": "ef604039-4f93-490e-9dc3-fa38abdbb272",
-          "body": "This is the reservation availability notification you requested.\n\nExam: Large motorcycle (大型自動二輪), Kanagawa\nAvailable dates:\n2026-11-09\n\nChecked at (Japan time): 2026-10-26T07:32:54.306776+09:00\nReservation page: https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\nPlease confirm availability on the official reservation page. This monitor does not make a reservation. Availability can change before you open the reservation page.",
-          "accepted_at": "2026-10-26T07:32:54.306776+09:00"
-        }
-      ],
-      "email:29b4a670c13fa61579b22cdd9a1214dcf46ba6b6f7a960f59ec2ac5787fb884e": [
-        {
-          "dates": [
-            "2026-11-09"
-          ],
-          "status": "sent",
-          "created_at": "2026-10-26T07:32:54.306776+09:00",
-          "retry_key": "4817bd1b-9907-44fd-a901-d543ec605140",
-          "body": "This is the reservation availability notification you requested.\n\nExam: Large motorcycle (大型自動二輪), Kanagawa\nAvailable dates:\n2026-11-09\n\nChecked at (Japan time): 2026-10-26T07:32:54.306776+09:00\nReservation page: https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\nPlease confirm availability on the official reservation page. This monitor does not make a reservation. Availability can change before you open the reservation page.",
-          "accepted_at": "2026-10-26T07:32:54.306776+09:00"
-        }
-      ],
-      "wechat:eb501568bc149645735aeb795a0e40390b83abe49e890a45bae9a86649669d0a": [
-        {
-          "dates": [
-            "2026-11-09"
-          ],
-          "status": "sent",
-          "created_at": "2026-10-26T07:32:54.306776+09:00",
-          "retry_key": "9afd9e09-c2fe-42e9-bd43-62d7a186d81c",
-          "body": "This is the reservation availability notification you requested.\n\nExam: Large motorcycle (大型自動二輪), Kanagawa\nAvailable dates:\n2026-11-09\n\nChecked at (Japan time): 2026-10-26T07:32:54.306776+09:00\nReservation page: https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\nPlease confirm availability on the official reservation page. This monitor does not make a reservation. Availability can change before you open the reservation page.",
-          "accepted_at": "2026-10-26T07:32:54.306776+09:00"
+          "status": "pending",
+          "created_at": "2026-10-30T10:27:08.909623+09:00",
+          "retry_key": "a98f8df4-479c-4a37-9b45-8861779f3851",
+          "body": "This is the reservation availability notification you requested.\n\nExam: Large motorcycle (大型自動二輪), Kanagawa\nAvailable dates:\n2026-11-30\n\nChecked at (Japan time): 2026-10-30T10:27:08.909623+09:00\nReservation page: https://dshinsei.e-kanagawa.lg.jp/140007-u/reserve/offerList_detail?tempSeq=45604&accessFrom=offerList\n\nPlease confirm availability on the official reservation page. This monitor does not make a reservation. Availability can change before you open the reservation page."
         }
       ]
     }
